@@ -7,7 +7,7 @@ A minimal Bash CLI tool that sends prompts to any OpenAI-compatible LLM API.
 - `curl`
 - `jq`
 
-## Setup
+## Setup Using groq API
 
 ```bash
 export ASK_API_URL="https://api.groq.com/openai/v1/chat/completions"
@@ -35,10 +35,3 @@ cat script.sh | ask "Explain what this Bash script does:"
 alias ask-fix="./ask 'Correct any grammatical errors in the input text. Input text:'"
 ask-fix "Rhythim is gonna get you"
 ```
-
-## Known Limitations
-
-- No conversation history; each call is stateless (single-turn only).
-- Requires both `curl` and `jq` to be installed.
-- Does not support streaming output.
-- No timeout handling; hangs if the API is unresponsive.
