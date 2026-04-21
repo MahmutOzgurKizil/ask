@@ -1,0 +1,56 @@
+#!/bin/bash
+
+API_URL="${ASK_API_URL}"
+MODEL="${ASK_MODEL}"
+API_KEY="${ASK_API_KEY}"
+
+if [ -z "$API_URL" ] || [ -z "$MODEL" ] || [ -z "$API_KEY" ]; then
+    echo "Error: ASK_API_URL, ASK_MODEL, and ASK_API_KEY must all be set." >&2
+    exit 1
+fi
+
+SYSTEM_PROMPT="You are a CLI tool. Output plain text only. No yapping. Keep the output concise."
+
+ARGS_INPUT="$*"
+PIPED_INPUT=""
+[ -p /dev/stdin ] && PIPED_INPUT=$(cat)
+
+if [ -z "$ARGS_INPUT" ] && [ -z "$PIPED_INPUT" ]; then
+    echo "Usage: ask [prompt...]" >&2
+    echo "       echo 'input' | ask [prompt...]" >&2
+    exit 1
+fi
+
+if [ -n "$ARGS_INPUT" ] && [ -n "$PIPED_INPUT" ]; then
+    USER_PROMPT="${ARGS_INPUT}"$'\n\n'"${PIPED_INPUT}"
+elif [ -n "$PIPED_INPUT" ]; then
+    USER_PROMPT="${PIPED_INPUT}"
+else
+    USER_PROMPT="${ARGS_INPUT}"
+fi
+
+JSON_PAYLOAD=$(jq -n \
+  --arg model "$MODEL" \
+  --arg sys "$SYSTEM_PROMPT" \
+  --arg usr "$USER_PROMPT" \
+  '{model: $model, messages: [{role: "system", content: $sys}, {role: "user", content: $usr}]}')
+
+RESPONSE=$(curl -s "$API_URL" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $API_KEY" \
+  -d "$JSON_PAYLOAD")
+
+ERROR_MSG=$(echo "$RESPONSE" | jq -r 'if type == "array" then .[0].error.message else .error.message end // empty')
+if [ -n "$ERROR_MSG" ]; then
+    echo "API Error: $ERROR_MSG" >&2
+    exit 1
+fi
+
+RESULT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+if [ -z "$RESULT" ]; then
+    echo "Unexpected API response:" >&2
+    echo "$RESPONSE" >&2
+    exit 1
+fi
+
+echo "$RESULT"
